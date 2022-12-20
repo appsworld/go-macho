@@ -31,8 +31,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
       with:
-        draft: false
-        prerelease: false
-        allowUpdates: true
         release_name: v1.1.8
         tag_name: v1.1.8
+        draft: false
+        prerelease: false
