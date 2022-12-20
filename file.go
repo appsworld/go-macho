@@ -19,10 +19,10 @@ import (
 
 	"github.com/blacktop/go-dwarf"
 
-	"github.com/blacktop/go-macho/pkg/codesign"
-	"github.com/blacktop/go-macho/pkg/fixupchains"
-	"github.com/blacktop/go-macho/pkg/trie"
-	"github.com/blacktop/go-macho/types"
+	"github.com/appsworld/go-macho/pkg/codesign"
+	"github.com/appsworld/go-macho/pkg/fixupchains"
+	"github.com/appsworld/go-macho/pkg/trie"
+	"github.com/appsworld/go-macho/types"
 )
 
 var ErrMachOSectionNotFound = errors.New("MachO missing required section")
