@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/appsworld/go-macho/types"
+	"github.com/blacktop/go-macho/types"
 )
 
 const IsDyldPreoptimized = 1 << 7

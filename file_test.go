@@ -6,15 +6,18 @@ package macho
 
 import (
 	"bytes"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
-	"github.com/appsworld/go-macho/internal/obscuretestdata"
-	"github.com/appsworld/go-macho/types"
-	"github.com/google/go-cmp/cmp"
+	"github.com/blacktop/go-dwarf"
+	"github.com/blacktop/go-macho/internal/obscuretestdata"
+	"github.com/blacktop/go-macho/types"
 )
 
 type fileTest struct {
@@ -296,19 +299,19 @@ func TestOpen(t *testing.T) {
 				switch l := l.(type) {
 				case *Segment:
 					have := &l.SegmentHeader
-					if !cmp.Equal(have, want, cmp.AllowUnexported()) {
+					if !reflect.DeepEqual(have, want) {
 						t.Errorf("open %s, command %d:\n\thave %#v\n\twant %#v\n", tt.file, i, have, want)
 					}
 				case *Dylib:
 					have := l
 					have.LoadBytes = nil
-					if !cmp.Equal(have, want, cmp.AllowUnexported()) {
+					if !reflect.DeepEqual(have, want) {
 						t.Errorf("open %s, command %d:\n\thave %#v\n\twant %#v\n", tt.file, i, have, want)
 					}
 				case *Rpath:
 					have := l
 					have.LoadBytes = nil
-					if !cmp.Equal(have, want, cmp.AllowUnexported()) {
+					if !reflect.DeepEqual(have, want) {
 						t.Errorf("open %s, command %d:\n\thave %#v\n\twant %#v\n", tt.file, i, have, want)
 					}
 				default:
@@ -434,5 +437,375 @@ func TestNewFatFile(t *testing.T) {
 
 	if fat.Arches[0].UUID().ID != "CC3C8D85-B0DE-3445-85BE-85111E9CC36F" {
 		t.Errorf("macho.UUID() = %s; want test", fat.Arches[0].UUID())
+	}
+}
+
+var fname string
+
+func init() {
+	flag.StringVar(&fname, "file", "", "MachO file to test")
+}
+
+func TestNewFile(t *testing.T) {
+	f, err := os.Open(fname)
+
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			t.Skipf("file %s not found", fname)
+		}
+		t.Fatal(err)
+	}
+
+	got, err := NewFile(f)
+	if err != nil {
+		t.Fatalf("NewFile() error = %v", err)
+		return
+	}
+
+	cs := got.CodeSignature()
+	if cs != nil {
+		fmt.Println(cs.Requirements[0].Detail)
+	}
+
+	d, err := got.DWARF()
+	if err != nil {
+		t.Fatalf("DWARF() error = %v", err)
+	}
+
+	r := d.Reader()
+
+	debugStrSec := got.Section("__DWARF", "__debug_str")
+	if debugStrSec == nil {
+		t.Fatalf("Section() error = section __DWARF.__debug_str not found")
+	}
+
+	names, err := d.DumpNames()
+	if err != nil {
+		t.Errorf("DWARF.DumpNames() error = %v", err)
+	}
+	for _, name := range names {
+		nameStr, err := got.GetCString(debugStrSec.Addr + uint64(name.StrOffset))
+		if err != nil {
+			t.Errorf("GetCString() error = %v", err)
+		}
+
+		for _, hdata := range name.HashData {
+			r.Seek(*hdata[0].(*dwarf.Offset))
+			entry, err := r.Next()
+			if err != nil {
+				t.Fatalf("DWARF.Reader().Next() error = %v", err)
+			}
+
+			switch entry.Tag {
+			case dwarf.TagInlinedSubroutine:
+			case dwarf.TagSubroutineType, dwarf.TagSubprogram:
+				ty, _ := d.Type(entry.Offset)
+				if ty.(*dwarf.FuncType).FileIndex > 0 {
+					fs, err := d.FilesForEntry(entry)
+					if err != nil {
+						t.Fatalf("DWARF.FilesForEntry() error = %v", err)
+					}
+					fmt.Printf("TAG: %s, NAME: %s, TYPE: %s\nFILE: %s\n", entry.Tag, nameStr, ty, fs[ty.(*dwarf.FuncType).FileIndex].Name)
+				}
+			default:
+				ty, _ := d.Type(entry.Offset)
+				declFile, dOK := entry.Val(dwarf.AttrDeclFile).(int64)
+				callFile, cOK := entry.Val(dwarf.AttrCallFile).(int64)
+				if dOK || cOK {
+					fs, err := d.FilesForEntry(entry)
+					if err != nil {
+						t.Fatalf("DWARF.FilesForEntry() error = %v", err)
+					}
+					fmt.Printf("TAG: %s, NAME: %s, TYPE: %s\nFILE: %s\n", entry.Tag, nameStr, ty, fs[declFile+callFile].Name)
+				} else {
+					fmt.Printf("TAG: %s, NAME: %s, TYPE: %s\n", entry.Tag, nameStr, ty)
+				}
+			}
+		}
+	}
+
+	nameSpaces, err := d.DumpNamespaces()
+	if err != nil {
+		t.Fatalf("DWARF.DumpNamespaces() error = %v", err)
+	}
+	for _, ns := range nameSpaces {
+		nsStr, err := got.GetCString(debugStrSec.Addr + uint64(ns.StrOffset))
+		if err != nil {
+			t.Errorf("GetCString() error = %v", err)
+		}
+		for _, hdata := range ns.HashData {
+			r.Seek(*hdata[0].(*dwarf.Offset))
+			entry, err := r.Next()
+			if err != nil {
+				t.Fatalf("DWARF.Reader().Next() error = %v", err)
+			}
+
+			typ, err := d.Type(entry.Offset)
+			if err != nil {
+				t.Fatalf("DWARF.Type() error = %v", err)
+			}
+			fmt.Printf("TAG: %s, NAME: %s, TYPE: %s\n", entry.Tag, nsStr, typ)
+		}
+	}
+
+	objc, err := d.DumpObjC()
+	if err != nil {
+		t.Fatalf("DWARF.DumpObjC() error = %v", err)
+	}
+	for _, oc := range objc {
+		nsStr, err := got.GetCString(debugStrSec.Addr + uint64(oc.StrOffset))
+		if err != nil {
+			t.Errorf("GetCString() error = %v", err)
+		}
+		fmt.Println(nsStr)
+	}
+
+	types, err := d.DumpTypes()
+	if err != nil {
+		t.Fatalf("DWARF.LookDumpTypesupType() error = %v", err)
+	}
+	for _, typ := range types {
+		typStr, err := got.GetCString(debugStrSec.Addr + uint64(typ.StrOffset))
+		if err != nil {
+			t.Errorf("GetCString() error = %v", err)
+		}
+		fmt.Println(typStr)
+	}
+
+	off, err := d.LookupType("thread")
+	if err != nil {
+		t.Fatalf("DWARF.LookupType() error = %v", err)
+	}
+
+	r.Seek(off)
+
+	entry, err := r.Next()
+	if err != nil {
+		t.Fatalf("DWARF.Reader().Next() error = %v", err)
+	}
+
+	if entry.Tag == dwarf.TagStructType {
+		typ, err := d.Type(entry.Offset)
+		if err != nil {
+			t.Errorf("DWARF entry.Type() error = %v", err)
+		}
+		if t1, ok := typ.(*dwarf.StructType); ok {
+			if strings.EqualFold(t1.StructName, "thread") {
+				if !t1.Incomplete {
+					fmt.Println(t1.Defn())
+				}
+			}
+		}
+	}
+
+	fmt.Println(got.FileTOC.String())
+}
+
+func TestNewFileWithSwift(t *testing.T) {
+	f, err := os.Open(fname)
+
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			t.Skipf("file %s not found", fname)
+		}
+		t.Fatal(err)
+	}
+
+	got, err := NewFile(f)
+	if err != nil {
+		t.Fatalf("NewFile() error = %v", err)
+		return
+	}
+
+	prots, err := got.GetSwiftProtocols()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftProtocols() error = %v", err)
+	}
+	for _, prot := range prots {
+		fmt.Println(prot)
+	}
+
+	protsconfs, err := got.GetSwiftProtocolConformances()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftProtocolConformances() error = %v", err)
+	}
+	for _, prot := range protsconfs {
+		fmt.Println(prot)
+	}
+
+	atyps, err := got.GetSwiftAssociatedTypes()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftAssociatedTypes() error = %v", err)
+	}
+	for _, at := range atyps {
+		fmt.Println(at)
+	}
+
+	bins, err := got.GetSwiftBuiltinTypes()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftBuiltinTypes() error = %v", err)
+	}
+	for _, bin := range bins {
+		fmt.Println(bin)
+	}
+
+	fds, err := got.GetSwiftFields()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftFields() error = %v", err)
+	}
+	for _, f := range fds {
+		fmt.Println(f)
+	}
+
+	clos, err := got.GetSwiftClosures()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftClosures() error = %v", err)
+	}
+	for _, c := range clos {
+		fmt.Println(c)
+	}
+
+	rep, err := got.GetSwiftDynamicReplacementInfo()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftDynamicReplacementInfo() error = %v", err)
+	}
+	// for _, t := range typs {
+	fmt.Println(rep)
+	// }
+	typs, err := got.GetSwiftTypes()
+	if err != nil && !errors.Is(err, ErrSwiftSectionError) {
+		t.Fatalf("GetSwiftTypes() error = %v", err)
+	}
+	for _, t := range typs {
+		fmt.Println(t)
+	}
+}
+
+func TestNewFileWithObjC(t *testing.T) {
+	f, err := os.Open(fname)
+
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			t.Skipf("file %s not found", fname)
+		}
+		t.Fatal(err)
+	}
+
+	got, err := NewFile(f)
+	if err != nil {
+		t.Fatalf("NewFile() error = %v", err)
+		return
+	}
+
+	if got.HasObjC() {
+		fmt.Println("HasPlusLoadMethod: ", got.HasPlusLoadMethod())
+		fmt.Println(got.GetObjCToc())
+
+		info, err := got.GetObjCImageInfo()
+		if err != nil && !errors.Is(err, ErrObjcSectionNotFound) {
+			t.Fatalf("GetObjCImageInfo() error = %v", err)
+		}
+		fmt.Printf("ObjCImageInfo:\n%s\n\n", info.Flags)
+
+		if cfstrs, err := got.GetCFStrings(); err == nil {
+			fmt.Println("CFStrings")
+			fmt.Println("---------")
+			for _, cfstr := range cfstrs {
+				fmt.Printf("%#x: %#v\n", cfstr.Address, cfstr.Name)
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+
+		if meths, err := got.GetObjCMethodLists(); err == nil {
+			fmt.Println("_OBJC_INSTANCE_METHODS")
+			fmt.Println("----------------------")
+			for _, m := range meths {
+				fmt.Printf("0x%011x: (%s) %s [%d]\n", m.ImpVMAddr, m.ReturnType(), m.Name, m.NumberOfArguments())
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+
+		if protos, err := got.GetObjCProtocols(); err == nil {
+			for _, proto := range protos {
+				fmt.Println(proto.String())
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+
+		if classes, err := got.GetObjCClasses(); err == nil {
+			for _, class := range classes {
+				fmt.Println(class.Verbose())
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+
+		if nlclasses, err := got.GetObjCNonLazyClasses(); err == nil {
+			for _, class := range nlclasses {
+				fmt.Println(class.String())
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+
+		if cats, err := got.GetObjCCategories(); err == nil {
+			for _, cat := range cats {
+				fmt.Println(cat.String())
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+
+		if nlcats, err := got.GetObjCNonLazyCategories(); err == nil {
+			for _, cat := range nlcats {
+				fmt.Println(cat.String())
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+
+		if selRefs, err := got.GetObjCProtoReferences(); err == nil {
+			fmt.Println("@proto refs")
+			for off, prot := range selRefs {
+				fmt.Printf("0x%011x -> 0x%011x: %s\n", off, prot.Ptr, prot.Name)
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+		if selRefs, err := got.GetObjCClassReferences(); err == nil {
+			fmt.Println("@class refs")
+			for off, sel := range selRefs {
+				fmt.Printf("0x%011x -> 0x%011x: %s\n", off, sel.ClassPtr, sel.Name)
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+		if selRefs, err := got.GetObjCSuperReferences(); err == nil {
+			fmt.Println("@super refs")
+			for off, sel := range selRefs {
+				fmt.Printf("0x%011x -> 0x%011x: %s\n", off, sel.ClassPtr, sel.SuperClass)
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+		if selRefs, err := got.GetObjCSelectorReferences(); err == nil {
+			fmt.Println("@selectors refs")
+			for off, sel := range selRefs {
+				fmt.Printf("0x%011x -> 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
+		if methods, err := got.GetObjCMethodNames(); err == nil {
+			fmt.Printf("\n@methods\n")
+			for vmaddr, method := range methods {
+				fmt.Printf("0x%011x: %s\n", vmaddr, method)
+			}
+		} else {
+			t.Errorf(err.Error())
+		}
 	}
 }

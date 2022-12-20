@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/appsworld/go-macho/types"
+	"github.com/blacktop/go-macho/types"
 )
 
 type DyldChainedFixups struct {

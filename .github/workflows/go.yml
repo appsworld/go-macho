@@ -2,9 +2,9 @@ name: Go
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
 
@@ -14,7 +14,7 @@ jobs:
     steps:
 
     - name: Set up Go
-      uses: actions/checkout@v2
+      uses: actions/setup-go@v1
       with:
         go-version: 1.19
       id: go
@@ -24,16 +24,3 @@ jobs:
 
     - name: Test
       run: go test
-
-    - name: Get version
-      run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
-      id: version
-
-    - name: release
-      uses: actions/checkout@v2
-      id: create_release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN  }}
-      with:
-        tag_name: ${{ env.release_tag }}
-        release_name: Release ${{ env.release_tag }}

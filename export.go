@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/appsworld/go-macho/pkg/fixupchains"
-	"github.com/appsworld/go-macho/pkg/trie"
-	"github.com/appsworld/go-macho/types"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/pkg/trie"
+	"github.com/blacktop/go-macho/types"
 )
 
 var reexportDeps uint64
