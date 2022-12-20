@@ -29,7 +29,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
       with:
-        release_name: v1.1.5444
-        tag_name: v1.1.5444
+        release_name: v1.1.19
+        tag_name: v1.1.19
         draft: false
         prerelease: false
