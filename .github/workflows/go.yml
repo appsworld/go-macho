@@ -24,7 +24,7 @@ jobs:
 
     - name: Test
       run: go test
-      
+
     - name: release
       uses: actions/create-release@v1
       id: create_release
@@ -35,3 +35,4 @@ jobs:
         prerelease: false
         allowUpdates: true
         release_name: v1.1.8
+        tag_name: v1.1.8
