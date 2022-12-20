@@ -7,10 +7,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/appsworld/go-macho/pkg/fixupchains"
-	"github.com/appsworld/go-macho/types/swift"
-	"github.com/appsworld/go-macho/types/swift/fields"
-	"github.com/appsworld/go-macho/types/swift/types"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/types/swift"
+	"github.com/blacktop/go-macho/types/swift/fields"
+	"github.com/blacktop/go-macho/types/swift/types"
 )
 
 const sizeOfInt32 = 4

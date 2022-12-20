@@ -17,11 +17,12 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/appsworld/go-macho/pkg/codesign"
-	"github.com/appsworld/go-macho/pkg/fixupchains"
-	"github.com/appsworld/go-macho/pkg/trie"
-	"github.com/appsworld/go-macho/types"
 	"github.com/blacktop/go-dwarf"
+
+	"github.com/blacktop/go-macho/pkg/codesign"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/pkg/trie"
+	"github.com/blacktop/go-macho/types"
 )
 
 var ErrMachOSectionNotFound = errors.New("MachO missing required section")
@@ -61,7 +62,7 @@ type FileTOC struct {
 	ByteOrder binary.ByteOrder
 	Loads     []Load
 	Sections  sections
-	Functions []types.Function
+	functions []types.Function
 }
 
 func (t *FileTOC) String() string {
@@ -693,6 +694,7 @@ func NewFile(r io.ReaderAt, config ...FileConfig) (*File, error) {
 			l.CompatVersion = hdr.CompatVersion.String()
 			f.Loads[i] = l
 			f.Dylibs = append(f.Dylibs, l)
+
 		case types.LC_ID_DYLIB:
 			var hdr types.DylibCmd
 			b := bytes.NewReader(cmddat)
@@ -711,8 +713,6 @@ func NewFile(r io.ReaderAt, config ...FileConfig) (*File, error) {
 			l.CurrentVersion = hdr.CurrentVersion.String()
 			l.CompatVersion = hdr.CompatVersion.String()
 			f.Loads[i] = l
-			f.DylibIDs = append(f.DylibIDs, l)
-
 		case types.LC_LOAD_DYLINKER:
 			var hdr types.DylinkerCmd
 			b := bytes.NewReader(cmddat)
@@ -728,8 +728,6 @@ func NewFile(r io.ReaderAt, config ...FileConfig) (*File, error) {
 			}
 			l.Name = cstring(cmddat[hdr.Name:])
 			f.Loads[i] = l
-			f.Dylinkers = append(f.Dylinkers, l)
-
 		case types.LC_ID_DYLINKER:
 			var hdr types.DylinkerIDCmd
 			b := bytes.NewReader(cmddat)
@@ -1174,7 +1172,6 @@ func NewFile(r io.ReaderAt, config ...FileConfig) (*File, error) {
 				return nil, fmt.Errorf("failed to read LC_DATA_IN_CODE entries: %v", err)
 			}
 			f.Loads[i] = l
-
 		case types.LC_SOURCE_VERSION:
 			var sv types.SourceVersionCmd
 			b := bytes.NewReader(cmddat)
@@ -1891,8 +1888,8 @@ func (f *File) FunctionStarts() *FunctionStarts {
 // GetFunctions returns the function array, or nil if none exists.
 func (f *File) GetFunctions(data ...byte) []types.Function {
 
-	if len(f.Functions) > 0 {
-		return f.Functions
+	if len(f.functions) > 0 {
+		return f.functions
 	}
 
 	var funcs []types.Function
@@ -1949,7 +1946,7 @@ func (f *File) GetFunctions(data ...byte) []types.Function {
 	}
 
 	// cache parsed functions
-	f.Functions = funcs
+	f.functions = funcs
 
 	return funcs
 }

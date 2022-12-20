@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/appsworld/go-macho/types"
-	"github.com/appsworld/go-macho/types/swift"
-	"github.com/appsworld/go-macho/types/swift/fields"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/go-macho/types/swift"
+	"github.com/blacktop/go-macho/types/swift/fields"
 )
 
 //go:generate stringer -type ContextDescriptorKind,TypeReferenceKind,MetadataInitializationKind -linecomment -output types_string.go

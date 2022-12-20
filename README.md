@@ -1,6 +1,6 @@
 # go-macho
 
-[![Go](https://github.com/appsworld/go-macho/workflows/Go/badge.svg?branch=master)](https://github.com/appsworld/go-macho/actions) [![Go Reference](https://pkg.go.dev/badge/github.com/appsworld/go-macho.svg)](https://pkg.go.dev/github.com/appsworld/go-macho) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
+[![Go](https://github.com/blacktop/go-macho/workflows/Go/badge.svg?branch=master)](https://github.com/blacktop/go-macho/actions) [![Go Reference](https://pkg.go.dev/badge/github.com/blacktop/go-macho.svg)](https://pkg.go.dev/github.com/blacktop/go-macho) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 
 > Package macho implements access to and creation of Mach-O object files.
 
@@ -21,7 +21,7 @@ This package goes beyond the Go's `debug/macho` to:
 ## Install
 
 ```bash
-$ go get github.com/appsworld/go-macho
+$ go get github.com/blacktop/go-macho
 ```
 
 ## Getting Started
@@ -29,7 +29,7 @@ $ go get github.com/appsworld/go-macho
 ```go
 package main
 
-import "github.com/appsworld/go-macho"
+import "github.com/blacktop/go-macho"
 
 func main() {
     m, err := macho.Open("/path/to/macho")
@@ -44,4 +44,4 @@ func main() {
 
 ## License
 
-MIT Copyright (c) 2021 **appsworld**
+MIT Copyright (c) 2020-2022 **blacktop**
