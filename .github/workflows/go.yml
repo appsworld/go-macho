@@ -14,7 +14,7 @@ jobs:
     steps:
 
     - name: Set up Go
-      uses: actions/setup-go@v1
+      uses: actions/checkout@v2
       with:
         go-version: 1.19
       id: go
@@ -30,12 +30,10 @@ jobs:
       id: version
 
     - name: release
-      uses: actions/create-release@v1
+      uses: actions/checkout@v2
       id: create_release
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN  }}
       with:
-        draft: false
-        prerelease: false
-        release_name: v1.1.8
-
+        tag_name: ${{ env.release_tag }}
+        release_name: Release ${{ env.release_tag }}
