@@ -37,5 +37,5 @@ jobs:
       with:
         draft: false
         prerelease: false
-        allowUpdates: true
+        release_name: v1.1.8
 
