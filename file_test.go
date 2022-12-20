@@ -15,9 +15,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/appsworld/go-macho/internal/obscuretestdata"
+	"github.com/appsworld/go-macho/types"
 	"github.com/blacktop/go-dwarf"
-	"github.com/blacktop/go-macho/internal/obscuretestdata"
-	"github.com/blacktop/go-macho/types"
 )
 
 type fileTest struct {
